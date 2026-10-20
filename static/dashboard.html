@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>webpagecheck</title>
+<script>
+  (() => {
+    const param = new URLSearchParams(window.location.search).get("scoutTheme");
+    const theme =
+      param || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    document.documentElement.setAttribute("data-theme", theme);
+  })();
+</script>
+<style>
+  :root {
+    color-scheme: light;
+    --cp-bg: #f7f4ef;
+    --cp-bg-elevated: #fcfbf8;
+    --cp-surface: #ffffff;
+    --cp-surface-soft: #f5f5f5;
+    --cp-border: #dedede;
+    --cp-border-strong: #919191;
+    --cp-text: #242424;
+    --cp-text-muted: #5c5c5c;
+    --cp-text-soft: #6f6f6f;
+    --cp-accent: #b11f4b;
+    --cp-accent-hover: #9a1a41;
+    --cp-accent-soft: rgba(177, 31, 75, 0.08);
+    --cp-accent-fg: #ffffff;
+    --cp-success: #16a34a;
+    --cp-danger: #dc2626;
+    --cp-warning: #f59e0b;
+    --cp-link: #0078d4;
+    --cp-shadow: 0 18px 48px rgba(0, 0, 0, 0.12);
+    --cp-overlay: rgba(255, 255, 255, 0.8);
+    --cp-panel: rgba(255, 255, 255, 0.86);
+    --cp-panel-strong: rgba(255, 255, 255, 0.96);
+    --cp-sheen: rgba(255, 255, 255, 0.55);
+    --cp-highlight: rgba(177, 31, 75, 0.12);
+  }
+  html[data-theme="dark"] {
+    color-scheme: dark;
+    --cp-bg: #3d3b3a;
+    --cp-bg-elevated: #343231;
+    --cp-surface: #292929;
+    --cp-surface-soft: #2e2e2e;
+    --cp-border: #474747;
+    --cp-border-strong: #5f5f5f;
+    --cp-text: #dedede;
+    --cp-text-muted: #919191;
+    --cp-text-soft: #b0b0b0;
+    --cp-accent: #fd8ea1;
+    --cp-accent-hover: #fb7b91;
+    --cp-accent-soft: rgba(253, 142, 161, 0.14);
+    --cp-accent-fg: #1a1a1a;
+    --cp-success: #4ade80;
+    --cp-danger: #f87171;
+    --cp-warning: #fbbf24;
+    --cp-link: #4da6ff;
+    --cp-shadow: 0 18px 48px rgba(0, 0, 0, 0.32);
+    --cp-overlay: rgba(41, 41, 41, 0.88);
+    --cp-panel: rgba(41, 41, 41, 0.72);
+    --cp-panel-strong: rgba(41, 41, 41, 0.96);
+    --cp-sheen: rgba(255, 255, 255, 0.04);
+    --cp-highlight: rgba(253, 142, 161, 0.12);
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; min-height:100vh; font-family:"Segoe UI", Aptos, Calibri, -apple-system, BlinkMacSystemFont, sans-serif; background:var(--cp-bg); background-image:radial-gradient(ellipse at top left, var(--cp-accent-soft), var(--cp-bg) 65%); color:var(--cp-text); }
+  header { background:var(--cp-surface); border-bottom:1px solid var(--cp-border); padding:16px 24px; display:flex; gap:16px; align-items:center; justify-content:space-between; }
+  header h1 { font-size:18px; margin:0; font-weight:600; }
+  main { max-width:1400px; margin:24px auto; padding:0 16px; display:grid; gap:20px; }
+  .card { min-width:0; background:var(--cp-surface); border:1px solid var(--cp-border); border-radius:16px; padding:20px; }
+  .card h2 { font-size:16px; margin:0 0 14px; }
+  .card h3 { font-size:14px; margin:22px 0 12px; padding-top:18px; border-top:1px solid var(--cp-border); }
+  .card h3:first-of-type { margin-top:0; padding-top:0; border-top:0; }
+  .row { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+  label { display:grid; gap:4px; font-size:13px; color:var(--cp-text-muted); }
+  input, select, textarea { font:inherit; padding:8px 12px; border:1px solid var(--cp-border); border-radius:0.625rem; color:var(--cp-text); background:var(--cp-surface); min-width:0; }
+  input[type=text], input[type=url], input[type=email], input[type=password], input[type=number] { width:100%; }
+  textarea { width:100%; min-height:60px; resize:vertical; }
+  button { font:inherit; padding:8px 12px; border-radius:0.625rem; border:1px solid var(--cp-border); background:var(--cp-surface); cursor:pointer; color:var(--cp-text); }
+  button:hover:not(:disabled) { background:var(--cp-surface-soft); border-color:var(--cp-border-strong); }
+  button.primary { background:var(--cp-accent); border-color:var(--cp-accent); color:var(--cp-accent-fg); }
+  button.primary:hover:not(:disabled) { background:var(--cp-accent-hover); border-color:var(--cp-accent-hover); }
+  button:disabled { opacity:.5; cursor:default; }
+  :focus-visible { outline:2px solid var(--cp-accent); outline-offset:3px; }
+  .icon-btn { width:34px; height:34px; padding:0; display:inline-flex; align-items:center; justify-content:center; }
+  .icon-btn svg { width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+  .icon-btn.danger { color:var(--cp-danger); }
+  .table-scroll { overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  .watch-table { min-width:1080px; }
+  th, td { text-align:left; padding:12px 8px; border-bottom:1px solid var(--cp-border); vertical-align:top; }
+  th { font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:var(--cp-text-muted); font-weight:600; }
+  .url { color:var(--cp-text-muted); font-size:12px; word-break:break-all; }
+  .pill { display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; background:var(--cp-accent-soft); color:var(--cp-accent); white-space:nowrap; }
+  .pill.off { background:var(--cp-surface-soft); color:var(--cp-text-muted); }
+  .pill.ok, .mode-pill.live { background:var(--cp-surface-soft); color:var(--cp-text); box-shadow:inset 3px 0 var(--cp-success); }
+  .pill.test, .mode-pill.test { background:var(--cp-surface-soft); color:var(--cp-text); box-shadow:inset 3px 0 var(--cp-warning); }
+  .pill.bad, .mode-pill.unset { background:var(--cp-surface-soft); color:var(--cp-text); box-shadow:inset 3px 0 var(--cp-danger); }
+  .mode-pill { display:inline-block; padding:4px 12px; border-radius:999px; font-size:13px; font-weight:600; background:var(--cp-surface-soft); color:var(--cp-text-muted); }
+  .card-head { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:14px; }
+  .card-head h2 { margin:0; }
+  .chevron-btn svg { transition:transform .2s; }
+  .chevron-btn.collapsed svg { transform:rotate(-90deg); }
+  .status-ok { color:var(--cp-success); font-weight:600; }
+  .status-error { color:var(--cp-danger); font-weight:600; }
+  .prob { font-weight:700; white-space:nowrap; }
+  .reason { color:var(--cp-text-muted); font-size:12px; margin-top:4px; overflow-wrap:anywhere; }
+  .actions { display:flex; gap:6px; flex-wrap:nowrap; }
+  .nowrap { white-space:nowrap; }
+  .thumbnail-link { display:block; width:108px; height:72px; border:1px solid var(--cp-border); border-radius:0.625rem; overflow:hidden; background:var(--cp-surface-soft); }
+  .thumbnail-link:hover { border-color:var(--cp-accent); }
+  .watch-thumbnail { display:block; width:100%; height:100%; object-fit:cover; object-position:top; }
+  .page-capture { max-width:100%; border:1px solid var(--cp-border); border-radius:0.625rem; }
+  .alert { border:1px solid var(--cp-border); border-radius:0.625rem; padding:12px; margin-bottom:12px; }
+  .alert pre { white-space:pre-wrap; font:inherit; font-size:13px; color:var(--cp-text-muted); margin:8px 0; }
+  .hidden { display:none !important; }
+  .grid-form { display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+  .grid-form .full { grid-column: 1 / -1; }
+  .toast { position:fixed; bottom:20px; right:20px; background:var(--cp-text); color:var(--cp-surface); padding:12px 16px; border-radius:0.625rem; font-size:14px; max-width:min(420px, calc(100vw - 40px)); display:none; }
+  .toast.error { background:var(--cp-surface); color:var(--cp-danger); border:1px solid var(--cp-danger); }
+  .hint { font-size:12px; color:var(--cp-text-muted); }
+  .empty { color:var(--cp-text-muted); text-align:center; padding:24px; }
+  @media (max-width:700px) { .grid-form { grid-template-columns:1fr; } .watch-table .last-check { display:none; } .card { padding:16px; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>webpagecheck</h1>
+  <span class="hint" id="ai-badge"></span>
+</header>
+
+<main>
+  <section class="card">
+    <div class="card-head">
+      <h2>Configuration</h2>
+      <button type="button" class="icon-btn chevron-btn" data-collapse="config" aria-expanded="true" title="Collapse" aria-label="Collapse">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+    </div>
+    <div id="config-body">
+      <h3>Email notifications</h3>
+      <form id="settings-form" class="grid-form">
+        <label>Sender address
+          <input type="email" name="email_sender" placeholder="DoNotReply@xxxx.azurecomm.net">
+        </label>
+        <label>Recipient addresses (comma-separated)
+          <input type="text" name="email_recipient" placeholder="you@example.com, other@example.com">
+        </label>
+        <div class="full row">
+          <button type="submit" class="primary">Save</button>
+          <button type="button" id="btn-test">Send test notification</button>
+          <button type="button" id="btn-toggle-email">Disable sending (test mode)</button>
+          <span class="mode-pill" id="channels"></span>
+        </div>
+      </form>
+
+      <h3>Site login</h3>
+      <form id="login-form" class="grid-form">
+        <label>Login
+          <input type="text" name="username" autocomplete="username" maxlength="100" placeholder="admin" required>
+        </label>
+        <label>New password (at least 8 characters)
+          <input type="password" name="password" autocomplete="new-password" minlength="8" maxlength="200" required>
+        </label>
+        <div class="full row">
+          <button type="submit" class="primary">Update login</button>
+          <span class="hint" id="login-status"></span>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="row" style="justify-content:space-between; margin-bottom:14px">
+      <h2 style="margin:0">Watched pages</h2>
+      <button class="primary" id="btn-new">+ Add page</button>
+    </div>
+    <div class="table-scroll" role="region" aria-label="Watched pages table" tabindex="0">
+      <table class="watch-table">
+        <thead>
+          <tr><th>Page</th><th>Mode</th><th>Interval</th><th class="last-check">Last check</th><th>Last capture</th><th>State</th><th>Last alert</th><th aria-label="Actions"></th></tr>
+        </thead>
+        <tbody id="watches"></tbody>
+      </table>
+    </div>
+    <div class="empty hidden" id="watches-empty">No watched pages yet.</div>
+  </section>
+
+  <section class="card hidden" id="scan-card">
+    <div class="row" style="justify-content:space-between">
+      <h2 id="scan-title">Scan</h2>
+      <button type="button" id="btn-scan-close">Close</button>
+    </div>
+    <div id="scan-body"></div>
+  </section>
+
+  <section class="card hidden" id="form-card">
+    <h2 id="form-title">New page</h2>
+    <form id="watch-form" class="grid-form">
+      <label class="full">Name
+        <input type="text" name="name" maxlength="100" placeholder="MVP Summit">
+      </label>
+      <label class="full">URL
+        <input type="url" name="url" required placeholder="https://summit.microsoft.com/en-us/">
+      </label>
+      <label>Mode
+        <select name="mode" id="mode">
+          <option value="ai">AI: detect a condition (probability)</option>
+          <option value="keyword">Keyword present or absent</option>
+          <option value="change">Content change</option>
+        </select>
+      </label>
+      <label>Check every (minutes)
+        <input type="number" name="interval_minutes" min="1" max="10080" value="60" required>
+      </label>
+      <label class="full hidden" data-mode="ai">Condition to detect (plain language)
+        <textarea name="ai_condition" maxlength="500" placeholder="Registrations for MVP Summit are open"></textarea>
+        <span class="hint">Describe what you are looking for. The AI answers with a probability.</span>
+      </label>
+      <label data-mode="ai" class="hidden">Notification threshold (%)
+        <input type="number" name="ai_threshold" min="1" max="100" value="70">
+      </label>
+      <label class="full hidden" data-mode="keyword">Keyword
+        <input type="text" name="keyword" maxlength="200" placeholder="Registration open">
+      </label>
+      <label class="full">Extra email addresses (optional)
+        <input type="text" name="extra_emails" placeholder="friend@example.com, colleague@example.com">
+        <span class="hint">They receive this alert, in addition to your main address.</span>
+      </label>
+      <label class="full">
+        <span class="row"><input type="checkbox" name="enabled" checked> Monitoring enabled</span>
+      </label>
+      <div class="full row">
+        <button type="submit" class="primary">Save</button>
+        <button type="button" id="btn-cancel">Cancel</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <h2>Alerts (preview)</h2>
+      <button type="button" class="icon-btn chevron-btn" data-collapse="alerts" aria-expanded="true" title="Collapse" aria-label="Collapse">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+    </div>
+    <div id="alerts-body">
+      <div class="empty hidden" id="alerts-empty">No alerts yet.</div>
+      <div id="alerts"></div>
+    </div>
+  </section>
+</main>
+
+<div class="toast" id="toast"></div>
+<script src="/static/dashboard.js"></script>
+</body>
+</html>

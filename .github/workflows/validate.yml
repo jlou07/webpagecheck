@@ -1,0 +1,61 @@
+name: Validate reader kit
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: Application, security and Chromium tests
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - name: Install locked dependencies
+        run: python -m pip install --require-hashes -r requirements.txt
+      - name: Check dependency consistency
+        run: python -m pip check
+      - name: Install Chromium
+        run: python -m playwright install chromium
+      - name: Run tests with real Chromium
+        env:
+          WPC_BROWSER_TESTS: '1'
+          PYTHONDONTWRITEBYTECODE: '1'
+          PYTHONUTF8: '1'
+        run: python -m unittest test_app test_security test_dashboard
+
+  infrastructure:
+    name: Compile infrastructure without deploying
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Compile Bicep
+        run: az bicep build --file infra/main.bicep --stdout > /dev/null
+      - name: Check PowerShell syntax
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $parseErrors = $null
+          $null = [System.Management.Automation.Language.Parser]::ParseFile(
+              (Join-Path $PWD 'deploy.ps1'), [ref]$tokens, [ref]$parseErrors
+          )
+          if ($parseErrors.Count -gt 0) {
+              $parseErrors | ForEach-Object { Write-Error $_.Message }
+              exit 1
+          }

@@ -1,0 +1,12 @@
+**
+!Dockerfile
+!.dockerignore
+!requirements.txt
+!app.py
+!monitor.py
+!store.py
+!ai.py
+!public_network.py
+!static/
+!static/dashboard.html
+!static/dashboard.js
