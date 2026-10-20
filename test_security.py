@@ -263,6 +263,7 @@ class ProxyIntegrationTests(unittest.TestCase):
             self.assertEqual([path for path, _ in origin.seen], ["/public-redirect", "/final"])
             for _, headers in origin.seen:
                 self.assertNotIn("Proxy-Authorization", headers)
+                self.assertEqual(headers["Accept-Language"], "en-US,en;q=0.8")
 
     def test_http_body_limit_is_preserved(self):
         with _origin() as origin, _simulated_public_transport(origin), mock.patch("monitor.MAX_BODY_BYTES", 6):
@@ -367,6 +368,7 @@ class BrowserConfigurationTests(unittest.TestCase):
                     self.assertTrue(settings["proxy"]["password"])
                     self.assertEqual(browser.new_context.call_args.kwargs["service_workers"], "block")
                     self.assertFalse(browser.new_context.call_args.kwargs["accept_downloads"])
+                    self.assertEqual(browser.new_context.call_args.kwargs["locale"], "en-US")
                     page.set_viewport_size.assert_called_once_with({"width": 1280, "height": 4000})
                     browser.close.assert_called_once()
 

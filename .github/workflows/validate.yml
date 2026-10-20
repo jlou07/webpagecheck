@@ -1,4 +1,4 @@
-name: Validate reader kit
+name: Validate application
 
 on:
   push:

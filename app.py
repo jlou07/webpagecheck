@@ -1,4 +1,4 @@
-"""Interface web et API pour configurer les surveillances de pages web."""
+"""Web interface and API for configuring web page monitoring."""
 
 from __future__ import annotations
 

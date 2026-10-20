@@ -1,4 +1,4 @@
-"""Vérifie les pages surveillées et envoie les notifications par email (Azure Communication Services)."""
+"""Check monitored pages and send email notifications using Azure Communication Services."""
 
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ SCREENSHOT_TIMEOUT_MS = 30000
 SCREENSHOT_MAX_HEIGHT = 4000
 
 Fetch = Callable[[str, float], str]
-# notify(titre, message, url_de_clic) -> liste des erreurs d'envoi
+# notify(title, message, click_url) -> list of delivery errors
 Notify = Callable[[str, str, str], list[str]]
 Clock = Callable[[], float]
 
@@ -54,7 +54,7 @@ class _TextExtractor(HTMLParser):
 
 
 def extract_text(html: str) -> str:
-    """Retourne le texte visible de la page, espaces normalisés."""
+    """Return visible page text with normalized whitespace."""
     parser = _TextExtractor()
     parser.feed(html)
     return " ".join(" ".join(parser.parts).split())
@@ -64,7 +64,7 @@ def fetch_html(url: str, timeout: float) -> str:
     validate_public_url(url)
     req = urllib.request.Request(
         url,
-        headers={"User-Agent": USER_AGENT, "Accept-Language": "fr,en;q=0.8"},
+        headers={"User-Agent": USER_AGENT, "Accept-Language": "en-US,en;q=0.8"},
     )
     with PublicProxy(timeout) as proxy:
         with proxy.opener().open(req, timeout=timeout) as resp:
@@ -82,7 +82,7 @@ def send_email(
     urgent: bool = False,
     image_jpeg: Optional[bytes] = None,
 ) -> None:
-    """Envoie un email via Azure Communication Services. Lève une exception en cas d'échec."""
+    """Send an email using Azure Communication Services; raise on failure."""
     from azure.communication.email import EmailClient
     from azure.core.exceptions import HttpResponseError
 
@@ -128,7 +128,7 @@ def chromium_sandbox_enabled() -> bool:
 
 
 def capture_screenshot(url: str) -> bytes:
-    """Capture la page en JPEG avec Chromium (Playwright). Lève une exception en cas d'échec."""
+    """Capture a JPEG using Playwright Chromium; raise on failure."""
     from playwright.sync_api import sync_playwright
 
     validate_public_url(url)
@@ -144,7 +144,7 @@ def capture_screenshot(url: str) -> bytes:
             ],
         )
         try:
-            # Un User-Agent de navigateur standard évite que les sites bloquent le Chromium headless.
+            # A standard browser User-Agent reduces headless Chromium blocking.
             user_agent = (
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
                 f"Chrome/{browser.version} Safari/537.36"
@@ -156,7 +156,7 @@ def capture_screenshot(url: str) -> bytes:
             context.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined});")
             page = context.new_page()
             page.goto(url, wait_until="load", timeout=SCREENSHOT_TIMEOUT_MS)
-            # Hauteur plafonnée : une page très longue ferait dépasser la mémoire du conteneur.
+            # Cap the height to avoid exhausting container memory on long pages.
             height = page.evaluate("document.documentElement.scrollHeight")
             page.set_viewport_size({"width": 1280, "height": min(max(height, 900), SCREENSHOT_MAX_HEIGHT)})
             return page.screenshot(type="jpeg", quality=70)
@@ -165,7 +165,7 @@ def capture_screenshot(url: str) -> bytes:
 
 
 def capture_screenshot_or_none(url: str) -> Optional[bytes]:
-    """Capture la page sans jamais bloquer l'envoi de l'alerte."""
+    """Attempt a capture without preventing alert delivery on failure."""
     try:
         return capture_screenshot(url)
     except Exception:
@@ -180,7 +180,7 @@ def channel_status(settings: dict[str, str], email_connection_string: Optional[s
 
 
 def _email_recipients(settings: dict[str, str], extra_emails: Optional[list[str]]) -> list[str]:
-    """Destinataires principaux puis adresses supplémentaires de l'alerte, sans doublon."""
+    """Return primary and extra recipients without duplicates."""
     recipients: list[str] = []
     for address in [*split_emails(settings.get("email_recipient", "")), *(extra_emails or [])]:
         if address.casefold() not in {r.casefold() for r in recipients}:
@@ -198,7 +198,7 @@ def send_all(
     urgent: bool = False,
     image_jpeg: Optional[bytes] = None,
 ) -> list[str]:
-    """Envoie l'alerte par email à chaque destinataire. Retourne la liste des erreurs."""
+    """Email the alert to each recipient and return delivery errors."""
     errors: list[str] = []
     recipients = _email_recipients(settings, extra_emails)
     if email_connection_string and settings.get("email_sender") and recipients:
@@ -228,7 +228,7 @@ def run_check(
     notify: Notify,
     evaluate: Optional[Evaluator] = None,
 ) -> dict[str, Any]:
-    """Vérifie une page et retourne le nouvel état. N'écrit rien elle-même."""
+    """Check a page and return its new state without persisting it."""
     new = dict(state)
     new["last_checked_ts"] = now
     new["notify_errors"] = []
@@ -305,7 +305,7 @@ def run_check(
 
 
 class Monitor:
-    """Exécute les vérifications, à la demande ou selon l'intervalle de chaque page."""
+    """Run checks on demand or according to each page's schedule."""
 
     def __init__(
         self,
@@ -355,7 +355,7 @@ class Monitor:
         image: Optional[bytes],
         watch_id: Optional[str] = None,
     ) -> tuple[str, list[str]]:
-        """Envoie l'alerte, ou la simule si l'envoi est désactivé. Retourne le statut et les erreurs."""
+        """Send or simulate an alert and return its status and delivery errors."""
         body = f"{message}\n\n{click_url}" if click_url else message
         alert = {"ts": self._clock(), "title": f"URGENT: {title}", "body": body, "recipients": recipients, "watch_id": watch_id}
         if not settings.get("email_enabled", True):
@@ -425,7 +425,7 @@ class Monitor:
         }
 
     def check_watch(self, watch_id: str) -> Optional[dict[str, Any]]:
-        """Vérifie une page immédiatement. Retourne la page mise à jour ou None si absente."""
+        """Check a page immediately; return the updated watch or None if missing."""
         with self._check_lock:
             watch = self._store.get_watch(watch_id)
             if watch is None:
@@ -447,7 +447,7 @@ class Monitor:
 
 
     def run_due(self) -> int:
-        """Vérifie les pages dont l'intervalle est écoulé. Retourne le nombre de pages vérifiées."""
+        """Check pages whose interval has elapsed and return the check count."""
         now = self._clock()
         checked = 0
         for watch in self._store.list_watches():

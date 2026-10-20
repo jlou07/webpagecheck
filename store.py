@@ -1,4 +1,4 @@
-"""Persistance JSON des pages surveillées et des réglages de notification."""
+"""JSON persistence for monitored pages and notification settings."""
 
 from __future__ import annotations
 
@@ -48,11 +48,12 @@ MAX_ALERTS = 10
 MIN_PASSWORD_LENGTH = 8
 MAX_PASSWORD_LENGTH = 200
 MAX_LOGIN_LENGTH = 100
+# Preserve the original persisted values for migration to English statuses.
 LEGACY_STATUS = {"simulé": "simulated", "envoyé": "sent", "échec": "failed", "non envoyé": "not sent"}
 
 
 def split_emails(raw: Any) -> list[str]:
-    """Découpe une liste ou une chaîne d'adresses séparées par des virgules, espaces ou points-virgules."""
+    """Split addresses supplied as a list or separated by commas, spaces or semicolons."""
     items = raw if isinstance(raw, list) else re.split(r"[,;\s]+", str(raw or ""))
     return [str(item).strip() for item in items if str(item).strip()]
 
@@ -70,7 +71,7 @@ def _parse_emails(raw: Any) -> list[str]:
 
 
 def validate_watch(data: dict[str, Any]) -> dict[str, Any]:
-    """Valide une page surveillée et retourne les champs normalisés."""
+    """Validate a watch and return its normalized fields."""
     url = str(data.get("url", "")).strip()
     error = _url_error(url)
     if error:
@@ -132,7 +133,7 @@ def validate_watch(data: dict[str, Any]) -> dict[str, Any]:
 
 
 def validate_settings(data: dict[str, Any], current: dict[str, str]) -> dict[str, str]:
-    """Valide les réglages. Un champ absent conserve sa valeur actuelle."""
+    """Validate settings, retaining current values for omitted fields."""
     merged = dict(current)
 
     if "email_sender" in data:
@@ -176,7 +177,7 @@ def _last_alert_summary(alert: dict[str, Any]) -> dict[str, Any]:
 
 
 class Store:
-    """Stocke les données dans un fichier JSON, écrit de façon atomique."""
+    """Persist data to a JSON file using atomic writes."""
 
     def __init__(self, path: Path) -> None:
         self._path = Path(path)
@@ -189,7 +190,7 @@ class Store:
         with self._path.open(encoding="utf-8") as fh:
             data = json.load(fh)
         settings = dict(DEFAULT_SETTINGS)
-        # Ignore les anciens réglages (ntfy, SMS) encore présents dans le fichier.
+        # Ignore legacy notification settings (ntfy, SMS) still present in the file.
         settings.update({k: v for k, v in data.get("settings", {}).items() if k in DEFAULT_SETTINGS})
         alerts = []
         for alert in data.get("alerts", []):
@@ -252,7 +253,7 @@ class Store:
                 if watch["id"] != watch_id:
                     continue
                 fields = validate_watch({**watch, **data})
-                # Une nouvelle cible ou un nouveau mode repart d'un état initial.
+                # A different target or monitoring condition resets the check state.
                 if any(fields[k] != watch.get(k) for k in ("url", "mode", "keyword", "ai_condition", "ai_threshold")):
                     fields_state: dict[str, Any] = {}
                     self._check_path(watch_id).unlink(missing_ok=True)
@@ -315,7 +316,7 @@ class Store:
         return self._path.parent / "alerts" / f"{alert_id}.jpg"
 
     def add_alert(self, alert: dict[str, Any], image_jpeg: Optional[bytes] = None) -> None:
-        """Ajoute une alerte à l'historique ; les plus anciennes et leurs images sont retirées."""
+        """Append an alert, removing the oldest entries and their images."""
         entry = {**alert, "id": uuid.uuid4().hex, "has_image": bool(image_jpeg)}
         with self._lock:
             if image_jpeg:
@@ -333,7 +334,7 @@ class Store:
             self._save()
 
     def list_alerts(self) -> list[dict[str, Any]]:
-        """Alertes les plus récentes d'abord."""
+        """Return alerts in reverse chronological order."""
         with self._lock:
             return [dict(alert) for alert in reversed(self._data.get("alerts", []))]
 

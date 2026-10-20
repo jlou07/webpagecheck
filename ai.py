@@ -1,4 +1,4 @@
-"""Évalue si une condition en langage naturel est remplie sur le texte d'une page (Azure OpenAI)."""
+"""Evaluate a natural-language condition against page text using Azure OpenAI."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ SYSTEM_PROMPT = (
     "probability is your confidence that the condition is met on the page."
 )
 
-# evaluate(condition, page_text) -> (probabilité entre 0 et 1, explication)
+# evaluate(condition, page_text) -> (probability between 0 and 1, explanation)
 Evaluator = Callable[[str, str], tuple[float, str]]
 
 
@@ -41,7 +41,7 @@ def make_azure_openai_evaluator(
     deployment: str,
     api_key: Optional[str] = None,
 ) -> Evaluator:
-    """Crée un évaluateur. Sans clé API, il utilise l'identité managée ou la connexion Azure CLI."""
+    """Create an evaluator using an API key or managed identity/Azure CLI credentials."""
     from openai import AzureOpenAI
 
     if api_key:

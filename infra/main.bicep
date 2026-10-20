@@ -1,21 +1,21 @@
-@description('Préfixe court des ressources (3 à 8 caractères, lettres minuscules et chiffres).')
+@description('Short resource prefix (3 to 8 lowercase letters and digits).')
 @minLength(3)
 @maxLength(8)
 param namePrefix string = 'wpc'
 
 param location string = resourceGroup().location
 
-@description('Mot de passe de l\'interface web (basic auth).')
+@description('Web interface password (Basic Auth).')
 @secure()
 param uiPassword string
 
-@description('Première passe : false (crée l\'infra). Seconde passe : true (déploie l\'app depuis ACR).')
+@description('First pass: false (create infrastructure). Second pass: true (deploy the app from ACR).')
 param deployApp bool = false
 
-@description('Image du conteneur, à fournir quand deployApp = true.')
+@description('Container image, required when deployApp = true.')
 param image string = ''
 
-@description('Sandbox Chromium activee par defaut. false uniquement avec acceptation explicite du risque sur un hote incompatible.')
+@description('Chromium sandbox enabled by default. Use false only after explicitly accepting the risk on an incompatible host.')
 param chromiumSandbox bool = true
 
 param deployOpenAi bool = true
@@ -26,7 +26,7 @@ param openAiDeploymentName string = 'gpt-4.1-mini'
 
 param deployEmail bool = true
 
-@description('Domaine personnalisé déjà vérifié dans le service Email, par exemple page.example.com. Vide : domaine Azure seul.')
+@description('Custom domain already verified in the Email service, for example page.example.com. Empty: Azure-managed domain only.')
 param customEmailDomain string = ''
 
 var suffix = uniqueString(resourceGroup().id)

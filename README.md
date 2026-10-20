@@ -1,34 +1,28 @@
 # webpagecheck
 
-## Version lecteur en préparation
+Monitors web pages on a schedule and sends you an email when something changes.
+A web interface lets you add pages and configure notifications. The optional
+AI mode evaluates a condition written in plain language and returns a confidence
+score.
 
-Cette copie indépendante contient l'application, ses tests et le parcours de
-déploiement PowerShell. Elle ne contient ni données de surveillance, ni captures
-privées, ni secrets, ni configuration d'une instance Azure existante.
+## Azure quick start
 
-Le dépôt reste privé pendant sa préparation. Aucun bouton **Deploy to Azure**,
-aucune image publique prête à l'emploi et aucune licence de redistribution ne
-sont encore fournis. Ne partagez pas ce lien comme un téléchargement accessible
-aux lecteurs avant la validation de ces points et le choix de la visibilité.
+The deployment script requires **Windows, PowerShell and Azure CLI**. You do
+not need Docker locally: the script builds the image in Azure Container Registry.
+The script uses Windows ACLs and cannot run unchanged on Linux, macOS, WSL or
+Cloud Shell.
 
-### Parcours de test Azure
+You need an Azure subscription and permission to create resources and assign
+roles to the managed identity. Contributor alone does not grant
+`Microsoft.Authorization/roleAssignments/write`. Resources incur charges:
+Container Apps keeps at least one replica running, alongside ACR, Azure Files,
+Log Analytics and, depending on your options, email and Azure OpenAI usage.
 
-Le parcours actuel utilise **Windows, PowerShell et Azure CLI**. Aucun Docker
-local n'est nécessaire : le script construit l'image dans Azure Container Registry.
-Le script utilise des ACL Windows et ne doit pas être lancé tel quel sous Linux,
-macOS, WSL ou Cloud Shell.
-
-Prévoyez une subscription Azure et les droits de créer les ressources et
-d'attribuer les rôles à l'identité managée. Contributor seul ne donne pas le droit
-`Microsoft.Authorization/roleAssignments/write`. Les ressources créées sont
-facturables : Container Apps conserve une réplique minimum, avec ACR, Azure Files,
-Log Analytics et, selon les options, les emails et les appels Azure OpenAI.
-
-Après clonage du dépôt et ouverture d'un terminal dans son dossier :
+Clone the repository, open a PowerShell terminal in its directory, then run:
 
 ```powershell
 az login
-$subscriptionId = Read-Host 'ID de votre subscription Azure'
+$subscriptionId = Read-Host 'Your Azure subscription ID'
 az account set --subscription $subscriptionId
 az account show --query "{Subscription:name,Id:id}" --output table
 az extension add --name containerapp --upgrade
@@ -41,48 +35,41 @@ $appName = "${namePrefix}-web"
     -DeployOpenAi:$false
 ```
 
-Ce premier parcours garde les notifications email mais désactive l'IA pour
-commencer sans quota de modèle. Pour activer l'IA dès le premier déploiement,
-omettez `-DeployOpenAi:$false` après avoir vérifié le modèle, sa version et les
-quotas de votre subscription. Choisissez les options avant d'exécuter le script,
-ne lancez pas les variantes les unes après les autres.
+This configuration enables email notifications but disables AI, so you can start
+without a model quota. To enable AI on the first deployment, omit
+`-DeployOpenAi:$false` after checking the model, its version and your subscription
+quotas. Choose your options before running the script; do not run each variant
+in sequence.
 
-À la fin, ouvrez l'URL HTTPS affichée. Consultez la section de déploiement plus
-bas pour récupérer le mot de passe initial dans un terminal privé. Définissez
-ensuite votre identifiant dans **Site login**, configurez l'expéditeur indiqué
-par le script et une adresse de réception que vous contrôlez.
+Open the HTTPS URL printed when deployment finishes. See the deployment section
+below to retrieve the initial password in a private terminal. Set your
+credentials under **Site login**, configure the sender address printed by the
+script and add a recipient address you control.
 
-Faites un seul test d'email réel, puis désactivez l'envoi pendant vos essais.
-Ajoutez `https://example.com/` en mode **Keyword**, avec le mot-clé
-`Example Domain`. **Scan** analyse sans email ni modification d'état ;
-**Check now** met à jour l'état et peut envoyer une alerte. Une alerte simulée
-n'est pas rejouée lorsque vous réactivez l'envoi.
+Send one real test email, then disable sending while experimenting. Add
+`https://example.com/` in **Keyword** mode with the keyword `Example Domain`.
+**Scan** analyzes without sending an email or changing the watch state;
+**Check now** updates the state and may send an alert. Simulated alerts are not
+replayed when you enable sending again.
 
-Le déploiement neuf complet dans une subscription lecteur reste à valider avant
-publication. Les tests locaux et la compilation Bicep ne prouvent pas la
-disponibilité régionale des services ni la réception des emails.
+### Deployment status and validation
 
-### Validation et limites
+A **Deploy to Azure** button and a public prebuilt image are not available yet.
+No redistribution license has been selected. A complete fresh deployment in a
+separate subscription still needs validation. Local tests and Bicep compilation
+do not prove regional service availability or email delivery.
 
-Le workflow GitHub Actions exécute les tests applicatifs, sécurité et navigateur
-sous Windows, compile le Bicep et vérifie la syntaxe PowerShell. Il n'utilise
-aucune connexion Azure, ne provisionne aucune ressource et ne publie aucune image.
-Le jeton GitHub du workflow est limité à la lecture du contenu.
+GitHub Actions runs application, security and browser tests on Windows, compiles
+Bicep and checks PowerShell syntax. It uses no Azure connection, provisions no
+resources and publishes no image. Its GitHub token has read-only content access.
 
-Les données locales, environnements Python, secrets et traces de déploiement
-sont exclus de Git. Le contexte Docker utilise une liste d'inclusion limitée
-aux fichiers d'exécution.
+Local data, Python environments, secrets and deployment traces are excluded
+from Git. The Docker build context includes only the required runtime files.
 
-Gardez la sandbox Chromium activée par défaut. Une incompatibilité de l'hôte
-doit être diagnostiquée avant toute désactivation explicite. L'interface utilise
-Basic Auth sur HTTPS, pas un SSO Entra ID avec MFA. Un audit CVE à jour de l'image,
-du système et du navigateur reste nécessaire avant une exposition sensible.
-
-La suite de ce document décrit les fonctionnalités et les options techniques.
-
----
-
-Monitors web pages on a schedule and sends you an email when something changes. A web interface lets you add pages and configure notifications. The AI mode describes what you are looking for in plain language and returns a probability.
+Keep the Chromium sandbox enabled by default. Diagnose host compatibility
+before explicitly disabling it. The interface uses Basic Auth over HTTPS, not
+Entra ID SSO with MFA. Audit the image, operating system and browser for current
+CVEs before exposing a sensitive deployment.
 
 ## Monitoring modes
 
@@ -147,6 +134,11 @@ python -m unittest test_app test_dashboard
 ```
 
 ## Network security
+
+The HTTP collector requests English content, and Chromium uses the `en-US`
+locale. Watch names, keywords and AI conditions remain user-supplied and may use
+any language. Existing legacy alert status values are still recognized for
+data migration.
 
 Only public Internet HTTP/HTTPS destinations are supported. Loopback, private,
 link-local, reserved and multicast addresses are rejected, including IPv6 and
@@ -234,7 +226,7 @@ terminal (never in shared CI logs):
 az containerapp secret list --resource-group $resourceGroup --name $appName --show-values --query "[?name=='ui-password'].value | [0]" --output tsv
 ```
 
-The variables above come from the reader walkthrough. The `--show-values` option
+The variables above come from the quick start. The `--show-values` option
 explicitly displays the initial password: do not record, screenshot or transcribe
 its output. This deployment script uses Windows ACLs to protect the temporary file.
 Running it again without `-UiPassword` generates a new initial password. A login
