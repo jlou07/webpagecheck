@@ -358,6 +358,7 @@ class BrowserConfigurationTests(unittest.TestCase):
                     page = browser.new_context.return_value.new_page.return_value
                     page.evaluate.return_value = 10000
                     page.screenshot.return_value = b"jpeg"
+                    page.content.return_value = "<p>rendered</p>"
                     self.assertEqual(capture_screenshot("https://example.com"), b"jpeg")
                     settings = engine.chromium.launch.call_args.kwargs
                     self.assertEqual(settings["chromium_sandbox"], value.strip().lower() == "true")

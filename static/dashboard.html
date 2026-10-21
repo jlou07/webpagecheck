@@ -201,10 +201,10 @@
     <h2 id="form-title">New page</h2>
     <form id="watch-form" class="grid-form">
       <label class="full">Name
-        <input type="text" name="name" maxlength="100" placeholder="MVP Summit">
+        <input type="text" name="name" maxlength="100" placeholder="Example Domain">
       </label>
       <label class="full">URL
-        <input type="url" name="url" required placeholder="https://summit.microsoft.com/en-us/">
+        <input type="url" name="url" required placeholder="https://example.com/">
       </label>
       <label>Mode
         <select name="mode" id="mode">
@@ -217,14 +217,14 @@
         <input type="number" name="interval_minutes" min="1" max="10080" value="60" required>
       </label>
       <label class="full hidden" data-mode="ai">Condition to detect (plain language)
-        <textarea name="ai_condition" maxlength="500" placeholder="Registrations for MVP Summit are open"></textarea>
+        <textarea name="ai_condition" maxlength="500" placeholder="The page says this domain is for documentation examples"></textarea>
         <span class="hint">Describe what you are looking for. The AI answers with a probability.</span>
       </label>
       <label data-mode="ai" class="hidden">Notification threshold (%)
         <input type="number" name="ai_threshold" min="1" max="100" value="70">
       </label>
       <label class="full hidden" data-mode="keyword">Keyword
-        <input type="text" name="keyword" maxlength="200" placeholder="Registration open">
+        <input type="text" name="keyword" maxlength="200" placeholder="documentation">
       </label>
       <label class="full">Extra email addresses (optional)
         <input type="text" name="extra_emails" placeholder="friend@example.com, colleague@example.com">

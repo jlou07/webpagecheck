@@ -77,6 +77,8 @@ CVEs before exposing a sensitive deployment.
 - **Keyword**: alerts when a keyword appears on the page, and again when it disappears.
 - **AI**: you describe the expected change (for example "Registrations for MVP Summit are open"). The Azure OpenAI model returns a probability from 0 to 100 %. An alert is sent once, when the probability crosses the threshold (70 % by default). Another alert is sent only after the probability drops below the threshold and rises above it again.
 
+Keyword and AI modes read the page as rendered by Chromium (after JavaScript runs), so text injected by scripts is seen. If Chromium is unavailable, they fall back to the raw HTML. Change mode always hashes the raw HTML so that a browser failure never triggers a false change alert.
+
 ## Interface
 
 - **Configuration** (top, collapsible with the chevron at its top right): email notifications (sender, recipients, test, sending on or off) and the site login. A coloured badge shows the sending mode: green when alerts are emailed, amber in test mode (alerts are only simulated), red when email is not configured.
@@ -192,12 +194,14 @@ Environment variables:
 | `AZURE_OPENAI_DEPLOYMENT` | Model deployment name (required with the endpoint). |
 | `AZURE_OPENAI_API_KEY` | Optional. Otherwise Entra ID authentication (`DefaultAzureCredential`) is used. |
 
-## Example: MVP Summit
+## Example: Example Domain
 
-- Name: `MVP Summit`
-- URL: `https://summit.microsoft.com/en-us/`
+The **Add page** form is pre-filled with this example:
+
+- Name: `Example Domain`
+- URL: `https://example.com/`
 - Mode: AI
-- Condition: `Registrations for MVP Summit are open`
+- Condition: `The page says this domain is for documentation examples`
 - Threshold: 70 %
 - Interval: 60 minutes
 

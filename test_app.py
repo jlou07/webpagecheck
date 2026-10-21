@@ -119,7 +119,7 @@ class EmailRecipientTests(unittest.TestCase):
                 {"url": "https://example.com", "mode": "keyword", "keyword": "open", "extra_emails": "friend@x.com"}
             )
             monitor = Monitor(store, "conn", evaluate=None, fetch=lambda url, timeout: "Registration is open")
-            with mock.patch("monitor.capture_screenshot_or_none", return_value=None), mock.patch(
+            with mock.patch("monitor.capture_page_or_none", return_value=(None, None)), mock.patch(
                 "monitor.send_all", return_value=[]
             ) as sender:
                 monitor.check_watch(watch["id"])
@@ -167,7 +167,7 @@ class EmailRecipientTests(unittest.TestCase):
         self.assertEqual(base64.b64decode(attachment["contentInBase64"]), b"jpeg-bytes")
 
     def test_capture_failure_returns_none_instead_of_raising(self):
-        with mock.patch("monitor.capture_screenshot", side_effect=RuntimeError("Chromium is missing")):
+        with mock.patch("monitor.capture_page", side_effect=RuntimeError("Chromium is missing")):
             self.assertIsNone(capture_screenshot_or_none("https://example.com"))
 
     def test_check_and_alert_share_one_screenshot(self):
@@ -176,7 +176,7 @@ class EmailRecipientTests(unittest.TestCase):
             store.update_settings({"email_sender": "DoNotReply@x.azurecomm.net", "email_recipient": "primary@x.com"})
             watch = store.create_watch({"url": "https://example.com", "mode": "keyword", "keyword": "open"})
             monitor = Monitor(store, "conn", evaluate=None, fetch=lambda url, timeout: "Registration is open")
-            with mock.patch("monitor.capture_screenshot_or_none", return_value=b"jpeg") as capture, mock.patch(
+            with mock.patch("monitor.capture_page_or_none", return_value=(None, b"jpeg")) as capture, mock.patch(
                 "monitor.send_all", return_value=[]
             ) as sender:
                 monitor.check_watch(watch["id"])
@@ -188,10 +188,36 @@ class EmailRecipientTests(unittest.TestCase):
             store = Store(Path(tmp) / "config.json")
             watch = store.create_watch({"url": "https://example.com", "mode": "keyword", "keyword": "open"})
             monitor = Monitor(store, None, evaluate=None, fetch=lambda url, timeout: "Registration is open")
-            with mock.patch("monitor.capture_screenshot_or_none", return_value=b"jpeg") as capture:
+            with mock.patch("monitor.capture_page_or_none", return_value=(None, b"jpeg")) as capture:
                 monitor.check_watch(watch["id"])
             self.assertEqual(store.get_watch_image(watch["id"]), b"jpeg")
         capture.assert_called_once_with("https://example.com")
+
+    def test_keyword_injected_by_javascript_is_detected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = Store(Path(tmp) / "config.json")
+            watch = store.create_watch({"url": "https://example.com", "mode": "keyword", "keyword": "dominio"})
+            monitor = Monitor(store, None, evaluate=None, fetch=lambda url, timeout: "<p>This domain</p>")
+            rendered = "<p>This domain</p><p lang=es>Este dominio</p>"
+            with mock.patch("monitor.capture_page_or_none", return_value=(rendered, None)):
+                self.assertTrue(monitor.scan_watch(watch["id"])["result"]["present"])
+                self.assertTrue(monitor.check_watch(watch["id"])["state"]["keyword_present"])
+
+    def test_keyword_falls_back_to_raw_html_when_browser_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = Store(Path(tmp) / "config.json")
+            watch = store.create_watch({"url": "https://example.com", "mode": "keyword", "keyword": "open"})
+            monitor = Monitor(store, None, evaluate=None, fetch=lambda url, timeout: "Registration is open")
+            with mock.patch("monitor.capture_page_or_none", return_value=(None, None)):
+                self.assertTrue(monitor.check_watch(watch["id"])["state"]["keyword_present"])
+
+    def test_change_mode_hash_ignores_rendered_html(self):
+        watch = _watch(mode="change")
+        raw = run_check(watch, {}, 1.0, lambda url, timeout: "<p>Same</p>", lambda *a: [])
+        rendered = run_check(
+            watch, {}, 1.0, lambda url, timeout: "<p>Same</p>", lambda *a: [], rendered_html="<p>Same</p><p>JS</p>"
+        )
+        self.assertEqual(raw["last_hash"], rendered["last_hash"])
 
 
     def test_too_many_requests_explains_the_quota(self):
@@ -218,7 +244,7 @@ class AlertHistoryTests(unittest.TestCase):
 
     def test_disabled_email_records_simulated_alert_without_sending(self):
         self.store.update_settings({"email_enabled": False})
-        with mock.patch("monitor.capture_screenshot_or_none", return_value=b"jpeg"), mock.patch("monitor.send_all") as sender:
+        with mock.patch("monitor.capture_page_or_none", return_value=(None, b"jpeg")), mock.patch("monitor.send_all") as sender:
             self._trigger_alert("conn")
         sender.assert_not_called()
         alert = self.store.list_alerts()[0]
@@ -227,13 +253,13 @@ class AlertHistoryTests(unittest.TestCase):
         self.assertEqual(self.store.get_alert_image(alert["id"]), b"jpeg")
 
     def test_enabled_email_records_sent_alert(self):
-        with mock.patch("monitor.capture_screenshot_or_none", return_value=None), mock.patch("monitor.send_all", return_value=[]):
+        with mock.patch("monitor.capture_page_or_none", return_value=(None, None)), mock.patch("monitor.send_all", return_value=[]):
             self._trigger_alert("conn")
         self.assertEqual(self.store.list_alerts()[0]["status"], "sent")
 
 
     def test_failed_email_records_failed_alert(self):
-        with mock.patch("monitor.capture_screenshot_or_none", return_value=None), mock.patch(
+        with mock.patch("monitor.capture_page_or_none", return_value=(None, None)), mock.patch(
             "monitor.send_all", return_value=["email (primary@x.com) : rejected"]
         ):
             self._trigger_alert("conn")
@@ -311,7 +337,7 @@ class LastCheckCaptureTests(unittest.TestCase):
         self.client = create_app(self.store, self.monitor, PASSWORD).test_client()
         self.auth = {"Authorization": "Basic " + base64.b64encode(f"u:{PASSWORD}".encode()).decode()}
         self.image_url = f"/api/watches/{self.watch['id']}/image"
-        self.capture = mock.patch("monitor.capture_screenshot_or_none", return_value=b"first-jpeg")
+        self.capture = mock.patch("monitor.capture_page_or_none", return_value=(None, b"first-jpeg"))
         self.capture_mock = self.capture.start()
         self.addCleanup(self.capture.stop)
 
@@ -327,7 +353,7 @@ class LastCheckCaptureTests(unittest.TestCase):
 
     def test_every_check_replaces_capture_even_without_content_change(self):
         self.monitor.check_watch(self.watch["id"])
-        self.capture_mock.return_value = b"second-jpeg"
+        self.capture_mock.return_value = (None, b"second-jpeg")
         self.monitor.check_watch(self.watch["id"])
         self.assertEqual(self.store.get_watch_image(self.watch["id"]), b"second-jpeg")
         self.assertEqual(self.store.list_alerts(), [])
@@ -335,7 +361,7 @@ class LastCheckCaptureTests(unittest.TestCase):
 
     def test_capture_failure_clears_previous_image_but_check_still_succeeds(self):
         self.monitor.check_watch(self.watch["id"])
-        self.capture_mock.return_value = None
+        self.capture_mock.return_value = (None, None)
         result = self.monitor.check_watch(self.watch["id"])
         self.assertEqual(result["state"]["last_status"], "ok")
         self.assertFalse(result["state"]["has_image"])
@@ -351,7 +377,7 @@ class LastCheckCaptureTests(unittest.TestCase):
 
     def test_failed_check_does_not_reuse_an_old_capture(self):
         self.monitor.check_watch(self.watch["id"])
-        self.capture_mock.return_value = None
+        self.capture_mock.return_value = (None, None)
         monitor = Monitor(
             self.store, None, fetch=mock.Mock(side_effect=RuntimeError("page unavailable")), clock=lambda: 200.0
         )
@@ -363,7 +389,7 @@ class LastCheckCaptureTests(unittest.TestCase):
 
     def test_scan_leaves_last_check_capture_and_state_unchanged(self):
         checked = self.monitor.check_watch(self.watch["id"])
-        self.capture_mock.return_value = b"scan-jpeg"
+        self.capture_mock.return_value = (None, b"scan-jpeg")
         result = self.monitor.scan_watch(self.watch["id"])
         self.assertEqual(base64.b64decode(result["image"]), b"scan-jpeg")
         self.assertEqual(self.store.get_watch(self.watch["id"]), checked)
@@ -377,7 +403,7 @@ class LastCheckCaptureTests(unittest.TestCase):
         self.assertEqual(response.mimetype, "image/jpeg")
         self.assertEqual(response.data, b"first-jpeg")
         self.assertIn("no-store", response.headers["Cache-Control"])
-        self.capture_mock.return_value = b"second-jpeg"
+        self.capture_mock.return_value = (None, b"second-jpeg")
         self.monitor.check_watch(self.watch["id"])
         self.assertEqual(self.client.get(self.image_url, headers=self.auth).data, b"second-jpeg")
 
@@ -421,7 +447,7 @@ class ScanTests(unittest.TestCase):
 
     def test_scan_shows_ai_result_and_mail_without_changing_state(self):
         before = dict(self.store.get_watch(self.watch["id"])["state"])
-        with mock.patch("monitor.capture_screenshot_or_none", return_value=b"jpeg"), mock.patch("monitor.send_all") as sender:
+        with mock.patch("monitor.capture_page_or_none", return_value=(None, b"jpeg")), mock.patch("monitor.send_all") as sender:
             result = self.monitor.scan_watch(self.watch["id"])
         sender.assert_not_called()
         self.assertEqual(result["result"]["probability"], 90)
@@ -435,7 +461,7 @@ class ScanTests(unittest.TestCase):
     def test_change_scan_has_no_reference_on_first_scan(self):
         watch = self.store.create_watch({"url": "https://example.org", "mode": "change"})
         monitor = Monitor(self.store, None, evaluate=None, fetch=lambda url, timeout: "<p>Hello</p>")
-        with mock.patch("monitor.capture_screenshot_or_none", return_value=None):
+        with mock.patch("monitor.capture_page_or_none", return_value=(None, None)):
             result = monitor.scan_watch(watch["id"])
         self.assertIsNone(result["result"]["changed"])
         self.assertFalse(result["triggered"])
@@ -444,7 +470,7 @@ class ScanTests(unittest.TestCase):
         app = create_app(self.store, self.monitor, PASSWORD, "conn")
         auth = {"Authorization": "Basic " + base64.b64encode(f"u:{PASSWORD}".encode()).decode()}
         client = app.test_client()
-        with mock.patch("monitor.capture_screenshot_or_none", return_value=None):
+        with mock.patch("monitor.capture_page_or_none", return_value=(None, None)):
             response = client.post(f"/api/watches/{self.watch['id']}/scan", headers=auth)
             missing = client.post("/api/watches/unknown/scan", headers=auth)
         self.assertEqual(response.status_code, 200)
@@ -680,7 +706,7 @@ class LastAlertTests(unittest.TestCase):
     def test_simulated_check_records_last_alert(self):
         self.store.update_settings({"email_enabled": False})
         monitor = Monitor(self.store, None, evaluate=None, fetch=lambda url, timeout: "<p>Signal is here</p>")
-        with mock.patch("monitor.capture_screenshot_or_none", return_value=None):
+        with mock.patch("monitor.capture_page_or_none", return_value=(None, None)):
             monitor.check_watch(self.watch["id"])
         last = self.store.get_watch(self.watch["id"])["last_alert"]
         self.assertEqual((last["status"], last["title"]), ("simulated", "Keyword found: Example page"))

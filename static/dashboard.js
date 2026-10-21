@@ -138,9 +138,9 @@ function openForm(watch = null) {
     }
     form.elements.extra_emails.value = (watch.extra_emails || []).join(", ");
   } else {
-    form.elements.url.value = "https://summit.microsoft.com/en-us/";
-    form.elements.name.value = "MVP Summit";
-    form.elements.ai_condition.value = "Registrations for MVP Summit are open";
+    form.elements.url.value = "https://example.com/";
+    form.elements.name.value = "Example Domain";
+    form.elements.ai_condition.value = "The page says this domain is for documentation examples";
   }
   updateModeFields();
   $("#form-card").classList.remove("hidden");

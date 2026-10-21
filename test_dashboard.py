@@ -47,7 +47,7 @@ class DashboardBrowserTests(unittest.TestCase):
         self.monitor = Monitor(
             self.store, None, fetch=lambda url, timeout: "<p>Unchanged</p>", clock=lambda: float(next(clock))
         )
-        capture = mock.patch("monitor.capture_screenshot_or_none", return_value=self.first_image)
+        capture = mock.patch("monitor.capture_page_or_none", return_value=(None, self.first_image))
         self.capture = capture.start()
         self.addCleanup(capture.stop)
         self.monitor.check_watch(self.watch["id"])
@@ -99,7 +99,7 @@ class DashboardBrowserTests(unittest.TestCase):
     def test_check_now_refreshes_thumbnail_without_an_alert(self):
         link = self.page.locator(".thumbnail-link")
         previous = link.get_attribute("href")
-        self.capture.return_value = self.second_image
+        self.capture.return_value = (None, self.second_image)
         self.page.locator("#watches tr").first.get_by_role("button", name="Check now", exact=True).click()
         expect(link).not_to_have_attribute("href", previous)
         self.page.locator(".watch-thumbnail").evaluate("img => img.decode()")
@@ -109,7 +109,7 @@ class DashboardBrowserTests(unittest.TestCase):
 
     def test_scan_does_not_replace_last_check_thumbnail(self):
         previous = self.store.get_watch(self.watch["id"])
-        self.capture.return_value = self.second_image
+        self.capture.return_value = (None, self.second_image)
         self.page.locator("#watches tr").first.get_by_role(
             "button", name="Scan (analyze only, no email sent)", exact=True
         ).click()

@@ -25,6 +25,7 @@ HTTP_TIMEOUT_SECONDS = 30
 SCHEDULER_TICK_SECONDS = 15
 SCREENSHOT_TIMEOUT_MS = 30000
 SCREENSHOT_MAX_HEIGHT = 4000
+RENDER_IDLE_TIMEOUT_MS = 5000
 
 Fetch = Callable[[str, float], str]
 # notify(title, message, click_url) -> list of delivery errors
@@ -128,7 +129,12 @@ def chromium_sandbox_enabled() -> bool:
 
 
 def capture_screenshot(url: str) -> bytes:
-    """Capture a JPEG using Playwright Chromium; raise on failure."""
+    """Capture the page as JPEG with Chromium (Playwright). Raises on failure."""
+    return capture_page(url)[1]
+
+
+def capture_page(url: str) -> tuple[str, bytes]:
+    """Render the page with Chromium (JavaScript executed). Returns (rendered HTML, JPEG capture)."""
     from playwright.sync_api import sync_playwright
 
     validate_public_url(url)
@@ -156,21 +162,32 @@ def capture_screenshot(url: str) -> bytes:
             context.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined});")
             page = context.new_page()
             page.goto(url, wait_until="load", timeout=SCREENSHOT_TIMEOUT_MS)
+            # Give scripts time to inject content; some sites never become idle.
+            try:
+                page.wait_for_load_state("networkidle", timeout=RENDER_IDLE_TIMEOUT_MS)
+            except Exception:
+                pass
             # Cap the height to avoid exhausting container memory on long pages.
             height = page.evaluate("document.documentElement.scrollHeight")
             page.set_viewport_size({"width": 1280, "height": min(max(height, 900), SCREENSHOT_MAX_HEIGHT)})
-            return page.screenshot(type="jpeg", quality=70)
+            image = page.screenshot(type="jpeg", quality=70)
+            return page.content(), image
         finally:
             browser.close()
 
 
-def capture_screenshot_or_none(url: str) -> Optional[bytes]:
-    """Attempt a capture without preventing alert delivery on failure."""
+def capture_page_or_none(url: str) -> tuple[Optional[str], Optional[bytes]]:
+    """Render the page without ever blocking the check or the alert."""
     try:
-        return capture_screenshot(url)
+        return capture_page(url)
     except Exception:
         log.exception("Screenshot failed for %s", url)
-        return None
+        return None, None
+
+
+def capture_screenshot_or_none(url: str) -> Optional[bytes]:
+    """Capture the page without ever blocking the alert."""
+    return capture_page_or_none(url)[1]
 
 
 def channel_status(settings: dict[str, str], email_connection_string: Optional[str]) -> dict[str, bool]:
@@ -227,8 +244,13 @@ def run_check(
     fetch: Fetch,
     notify: Notify,
     evaluate: Optional[Evaluator] = None,
+    rendered_html: Optional[str] = None,
 ) -> dict[str, Any]:
-    """Check a page and return its new state without persisting it."""
+    """Check a page and return the new state. Writes nothing itself.
+
+    rendered_html (DOM after JavaScript) is used by keyword and AI modes; change mode keeps
+    the raw HTML so that its hash stays stable even when the browser fails.
+    """
     new = dict(state)
     new["last_checked_ts"] = now
     new["notify_errors"] = []
@@ -254,6 +276,7 @@ def run_check(
         notify_errors += notify(f"Page reachable again: {name}", "The page is reachable again.", url)
 
     text = extract_text(html)
+    content_text = extract_text(rendered_html) if rendered_html else text
     if watch["mode"] == "ai":
         if evaluate is None:
             new["last_status"] = "error"
@@ -261,7 +284,7 @@ def run_check(
             new["notify_errors"] = notify_errors
             return new
         try:
-            probability, reason = evaluate(watch["ai_condition"], text)
+            probability, reason = evaluate(watch["ai_condition"], content_text)
         except Exception as exc:
             log.exception("AI evaluation failed for %s", url)
             new["last_status"] = "error"
@@ -283,7 +306,7 @@ def run_check(
             )
     elif watch["mode"] == "keyword":
         keyword = watch["keyword"] or ""
-        present = keyword.casefold() in text.casefold()
+        present = keyword.casefold() in content_text.casefold()
         previous = bool(state.get("keyword_present"))
         new["keyword_present"] = present
         if present != previous:
@@ -385,11 +408,12 @@ class Monitor:
             return None
         url, name, mode = watch["url"], watch["name"], watch["mode"]
         text = extract_text(self._fetch(url, HTTP_TIMEOUT_SECONDS))
-        image = capture_screenshot_or_none(url)
+        rendered_html, image = capture_page_or_none(url)
+        content_text = extract_text(rendered_html) if rendered_html else text
         if mode == "ai":
             if self._evaluate is None:
                 raise RuntimeError("Azure OpenAI is not configured")
-            probability, reason = self._evaluate(watch["ai_condition"], text)
+            probability, reason = self._evaluate(watch["ai_condition"], content_text)
             percent = round(probability * 100)
             threshold = watch["ai_threshold"]
             triggered = percent >= threshold
@@ -398,7 +422,7 @@ class Monitor:
             message = f"{watch['ai_condition']}\n\n{reason}"
         elif mode == "keyword":
             keyword = watch["keyword"] or ""
-            present = keyword.casefold() in text.casefold()
+            present = keyword.casefold() in content_text.casefold()
             triggered = present
             result = {"keyword": keyword, "present": present}
             title = f"Keyword found: {name}"
@@ -431,7 +455,7 @@ class Monitor:
             if watch is None:
                 return None
             now = self._clock()
-            image = capture_screenshot_or_none(watch["url"])
+            rendered_html, image = capture_page_or_none(watch["url"])
             new_state = run_check(
                 watch,
                 watch.get("state", {}),
@@ -441,6 +465,7 @@ class Monitor:
                     title, message, url, image, watch.get("extra_emails"), watch_id
                 ),
                 self._evaluate,
+                rendered_html,
             )
             self._store.set_watch_state(watch_id, new_state, image)
             return self._store.get_watch(watch_id)
